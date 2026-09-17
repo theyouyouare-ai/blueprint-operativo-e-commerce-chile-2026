@@ -76,3 +76,4 @@ PostgreSQL y Redis del Compose original no estaban conectados a ningún cliente 
 ## Alcance comercial
 
 Este proyecto es un blueprint operativo desplegable, no una tienda transaccional completa. Incluye checkout y un adaptador oficial Webpay Plus configurable. No incluye Mercado Pago, inventario conectado ni seguimiento real de couriers; tampoco emisión efectiva de DTE al SII. Los tickets y simulaciones del navegador no equivalen a persistencia multiusuario. El seguimiento de ejemplo se identifica como demostración. Los textos legales, tarifas y cifras de mercado son referencias del contenido original y requieren revisión independiente antes de utilizarlos comercialmente; esta intervención valida software, no certifica normativa.
+# blueprint-operativo-e-commerce-chile-2026
