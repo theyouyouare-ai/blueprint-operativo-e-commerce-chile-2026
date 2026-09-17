@@ -1,18 +1,15 @@
 # Express serves dist/client and the payment API from one HTTPS origin.
-# Persistent disk requires a paid Web Service. One process/instance only.
+# Free service: no persistent disk; sandbox payment data is ephemeral.
 services:
   - type: web
     name: blueprint-operativo-ecommerce-chile
     runtime: node
-    plan: 0.5c-512mb
+    plan: free
+    region: oregon
     numInstances: 1
     buildCommand: corepack enable && corepack prepare pnpm@11.19.0 --activate && pnpm install --frozen-lockfile --prod=false && pnpm typecheck && PAYMENT_ENV=sandbox WEBPAY_COMMERCE_CODE= WEBPAY_API_KEY= APP_URL=http://localhost:3000 pnpm test:unit && pnpm build
-    startCommand: node dist/server.js
+    startCommand: NODE_ENV=production node dist/server.js
     healthCheckPath: /api/health
-    disk:
-      name: payment-orders
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: '22.22.0'
@@ -20,8 +17,6 @@ services:
         value: production
       - key: PAYMENT_ENV
         value: sandbox
-      - key: PAYMENT_STORE_DIR
-        value: /var/data/payments
       - key: PAYMENT_TIMEOUT_MS
         value: '10000'
       - key: WEBPAY_COMMERCE_CODE
