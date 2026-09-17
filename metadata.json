@@ -1,0 +1,7 @@
+{
+  "name": "Blueprint Operativo E-commerce Chile 2026",
+  "description": "Manual interactivo y simulador financiero de dropshipping transfronterizo Chile-LATAM actualizado a septiembre 2026 con Ley N°21.713, pasarelas locales y pauta publicitaria.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

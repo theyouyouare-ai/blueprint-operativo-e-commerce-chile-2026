@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_TIMEOUT_MS: ${GEMINI_TIMEOUT_MS:-12000}
+      GEMINI_COOLDOWN_MS: ${GEMINI_COOLDOWN_MS:-60000}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      EVENTS_API_TOKEN: ${EVENTS_API_TOKEN:-}
+    mem_limit: 1g
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: '5'
