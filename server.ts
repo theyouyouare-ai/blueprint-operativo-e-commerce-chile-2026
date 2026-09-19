@@ -1,3 +1,5 @@
+import { healthHandler } from './server/health';
+import { splitGrossCLP } from './src/checkout/model';
 import { config as loadEnv } from 'dotenv';
 import { GeminiResilience } from './server/gemini-resilience';
 import { z } from 'zod';
@@ -7,13 +9,14 @@ import { paymentConfig } from './src/server/payment-config';
 import { paymentCors } from './src/server/payment-cors';
 import { getPaymentRuntime } from './src/server/payment-runtime';
 import { timingSafeEqual } from 'node:crypto';
-import path from 'path';
+import { fileURLToPath } from 'node:url';
+import { productionSpa } from './server/production-spa';
 import { GoogleGenAI } from '@google/genai';
 import { STORE_FAQS, findMatchingFAQ, shouldTriggerEscalation, MOCK_TRACKING_DATABASE } from './src/data/chatbotKnowledge';
 import { INITIAL_MARKET_NEWS, INITIAL_COMPLIANCE_MILESTONES, OFFICIAL_REGULATORY_SOURCES } from './src/data/marketInsightsData';
 import { MarketNewsItem, GroundingSource, MarketInsightsResponse } from './src/types/marketInsights';
-import { validateProductionEnv } from './src/lib/env-validator';
-import { checkSupabaseAdminHealth, recordConversionEventAdmin } from './src/lib/supabase-admin';
+import { validateProductionEnv } from './server/env-validator';
+import { recordConversionEventAdmin } from './server/supabase-admin';
 
 loadEnv({ path: ['.env.local', '.env'], quiet: true });
 const env = validateProductionEnv({ strict: true }).data;
@@ -23,9 +26,16 @@ getPaymentRuntime();
 console.info(`[Payments] mode=${payments.mode}${payments.fallbackReason ? ' — ' + payments.fallbackReason : ''}`);
 const app = express();
 if (process.env.RENDER === 'true') app.set('trust proxy', 1);
+else if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY.split(',').map(value => value.trim()));
 const PORT = Number(env.PORT);
 const gemini = new GeminiResilience({ timeoutMs: Number(env.GEMINI_TIMEOUT_MS), cooldownMs: Number(env.GEMINI_COOLDOWN_MS), maxConcurrent: 4, retries: 1 });
 app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use('/api', paymentCors(payments));
 app.use('/api', (req, res, next) => {
   if (payments.mode === 'production' && !req.secure && req.path !== '/health') { res.status(400).json({ error: 'HTTPS requerido para pagos' }); return; }
@@ -33,49 +43,10 @@ app.use('/api', (req, res, next) => {
 });
 app.use('/api', checkoutRouter);
 app.use(express.json({ limit: '32kb' }));
-app.use((_req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  next();
-});
 
-// API health check enriquecido con métricas operativas
-app.get('/api/health', async (req, res) => {
-  const mem = process.memoryUsage();
-  const supabaseHealth = await checkSupabaseAdminHealth();
-
-  res.json({
-    status: 'ok',
-    service: 'ecommerce-support-chatbot',
-    environment: process.env.NODE_ENV || 'development',
-    uptimeSeconds: Math.floor(process.uptime()),
-    geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
-    circuitBreaker: gemini.status,
-    payments: { mode: payments.mode, provider: payments.mode === 'mock' ? 'webpay_plus_mock' : 'webpay_plus' },
-    services: {
-      database: {
-        configured: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URI),
-        type: 'postgresql'
-      },
-      redis: {
-        configured: Boolean(process.env.REDIS_URL),
-        type: 'redis'
-      },
-      supabaseAdmin: {
-        configured: supabaseHealth.configured,
-        serviceRoleIsolated: true,
-        healthy: supabaseHealth.healthy,
-        latencyMs: supabaseHealth.latencyMs
-      }
-    },
-    runtime: {
-      nodeVersion: process.version,
-      heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-      heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024)
-    },
-    timestamp: new Date().toISOString()
-  });
-});
+// Readiness: HTTP 200 only after active Supabase query and Redis PING.
+app.get(['/health', '/api/health'], healthHandler());
+app.get('/live', (_req, res) => { res.set('Cache-Control', 'no-store').json({ status: 'alive' }); });
 
 // Endpoint seguro para eventos de conversión y auditoría (Bypass RLS con Service Role)
 app.post('/api/v1/events', async (req, res) => {
@@ -88,7 +59,7 @@ app.post('/api/v1/events', async (req, res) => {
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return res.status(401).json({ error: 'No autorizado' });
     const input = z.object({
       eventId: z.string().min(1).max(128), eventName: z.string().min(1).max(128),
-      grossAmountCLP: z.number().finite().nonnegative().max(1e12),
+      grossAmountCLP: z.number().int().nonnegative().max(1e12),
       currency: z.literal('CLP').default('CLP'), metadata: z.record(z.string(), z.unknown()).optional()
     }).safeParse(req.body);
     if (!input.success) return res.status(400).json({ error: 'Evento inválido' });
@@ -96,7 +67,7 @@ app.post('/api/v1/events', async (req, res) => {
 
     // Cálculo tributario Ley N° 21.713 (19% IVA)
     const gross = Number(grossAmountCLP) || 0;
-    const netRevenue = Math.round(gross / 1.19);
+    const netRevenue = splitGrossCLP(gross).netCLP;
     const ivaAmount = gross - netRevenue;
 
     // Inserción defensiva no bloqueante con Supabase Service Role (Bypass RLS)
@@ -566,11 +537,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist/client');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    const distPath = fileURLToPath(new URL('./client/', import.meta.url));
+    app.use(productionSpa(distPath));
+    console.info(`[Startup] Sirviendo SPA desde ${distPath}`);
   }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
@@ -582,4 +551,4 @@ async function startServer() {
   });
 }
 
-startServer().catch(() => { console.error('No se pudo iniciar el servidor'); process.exit(1); });
+startServer().catch((error) => { console.error('No se pudo iniciar el servidor:', error); process.exit(1); });

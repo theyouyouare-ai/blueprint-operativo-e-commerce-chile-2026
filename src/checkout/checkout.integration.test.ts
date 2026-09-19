@@ -61,3 +61,24 @@ test('mock confirmation rejects a transaction without preparing DTE', async () =
   expect(data.order.status).toBe('failed');
   expect(data.order.dte39).toBeNull();
 });
+
+test('create-order alias shares idempotency with process and signed MP simulator webhook', async () => {
+  const { order, paymentToken } = await createOrder();
+  const raw = JSON.stringify({ orderId: order.id, transactionToken: paymentToken, status: 'AUTHORIZED', response_code: 0, amount: order.totals.totalCLP, currency: 'CLP' });
+  const timestamp = String(Date.now());
+  const headers = { 'Content-Type': 'application/json', 'x-payment-timestamp': timestamp, 'x-payment-signature': createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex') };
+  for (let n = 0; n < 2; n++) {
+    const response = await fetch(`${base}/api/webhooks/mercadopago`, { method: 'POST', headers, body: raw });
+    expect(response.status).toBe(200); expect((await response.json()).order.status).toBe('paid');
+  }
+  const unsigned = await fetch(`${base}/api/webhooks/mercadopago`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: raw });
+  expect(unsigned.status).toBe(401);
+  const body = { items: [{ productId: 'cepillo-vapor', quantity: 1 }], customer: { name: 'Cliente Demo', documentType: 'RUT', document: '12345678-5', email: 'test@example.com', phone: '+56912345678', address: 'Calle Demo 123', commune: 'Santiago', region: 'Metropolitana' } };
+  const options = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() }, body: JSON.stringify(body) };
+  const alias = await fetch(`${base}/api/checkout/create-order`, options);
+  expect(alias.status).toBe(200); const created = await alias.json();
+  const original = await fetch(`${base}/api/checkout/process`, options);
+  expect(await original.json()).toEqual(created);
+  const invalid = await fetch(`${base}/api/checkout/create-order`, { ...options, body: JSON.stringify({ ...body, customer: { ...body.customer, document: '12345678-9' } }) });
+  expect(invalid.status).toBe(400);
+});

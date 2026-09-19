@@ -13,6 +13,8 @@ export const ServerEnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1, {
     message: 'GEMINI_API_KEY es obligatoria para el funcionamiento del Asistente Auditor AI.'
   }).optional().or(z.literal('')),
+  SUPABASE_URL: z.string().url().optional().or(z.literal('')),
+  REDIS_URL: z.string().url().refine(value => ['redis:', 'rediss:'].includes(new URL(value).protocol)).optional().or(z.literal('')),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url({
     message: 'NEXT_PUBLIC_SUPABASE_URL debe ser una URL válida (ej: https://xyz.supabase.co).'
   }).optional().or(z.literal('')),

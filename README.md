@@ -58,14 +58,14 @@ La imagen usa un usuario sin privilegios, incluye health check y recibe secretos
 - `GEMINI_COOLDOWN_MS`: 60000. Un 429 abre inmediatamente el circuito sin reintentar; fallos persistentes o credenciales/modelo inválidos también activan la pausa. Tras la pausa se permite una sola solicitud de recuperación.
 - Máximo cuatro operaciones simultáneas y treinta operaciones nuevas por minuto por proceso, compartidas por chat y búsqueda. Cada operación admite como máximo dos intentos. Al exceder límites se usa contenido local.
 - Cache de insights: 20 minutos y 100 entradas. Actualizaciones explícitas omiten la cache, pero respetan el circuito y el presupuesto.
-- `/api/health` muestra configuración y estado del circuito. Una clave configurada no significa que su cuota/acceso esté validado.
+- `/health` y `/api/health` verifican Supabase y Redis activamente (200 disponibles, 503 ausentes o caídos); `/live` verifica solo el proceso. Una clave configurada no significa que su cuota/acceso esté validado.
 - La cache, el circuito y el presupuesto son locales al proceso: para múltiples réplicas se necesita coordinación externa y límites de cuota del proveedor.
 
 Configuración SDK contrastada con la [documentación oficial de HttpOptions](https://googleapis.github.io/js-genai/release_docs/interfaces/types.HttpOptions.html).
 
 ## Persistencia opcional
 
-`NEXT_PUBLIC_SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` activan Supabase en el backend. No utilizar prefijos `VITE_` para secretos. La ingesta `POST /api/v1/events` requiere `Authorization: Bearer <EVENTS_API_TOKEN>` y una tabla `conversion_events` con las columnas utilizadas en `src/lib/supabase-admin.ts`. El token es para integraciones servidor a servidor; no debe incluirse en el navegador. Sin token la ruta responde 503; si la escritura falla devuelve 503 con `success: false`.
+`NEXT_PUBLIC_SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` activan Supabase en el backend. No utilizar prefijos `VITE_` para secretos. La ingesta `POST /api/v1/events` requiere `Authorization: Bearer <EVENTS_API_TOKEN>` y una tabla `conversion_events` con las columnas utilizadas en `server/supabase-admin.ts`. El token es para integraciones servidor a servidor; no debe incluirse en el navegador. Sin token la ruta responde 503; si la escritura falla devuelve 503 con `success: false`.
 
 PostgreSQL y Redis del Compose original no estaban conectados a ningún cliente real; se retiraron esos contenedores de la configuración activa. La salud de Supabase usa un timeout de 3 segundos y las escrituras de 5 segundos.
 

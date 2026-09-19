@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { createHmac } from 'node:crypto';
-import { calculateTotals, validRut } from './model';
+import { calculateTotals, splitGrossCLP, validRut } from './model';
 import { CheckoutError, CheckoutService } from '../server/checkout-service';
 const customer = { name: 'Cliente Prueba', documentType: 'RUT', document: '12.345.678-5', email: 'prueba@example.com', phone: '+56 9 1234 5678', address: 'Calle Demo 123', commune: 'Santiago', region: 'Metropolitana' };
 const body = { items: [{ productId: 'cepillo-vapor', quantity: 1 }], customer };
@@ -97,4 +97,16 @@ describe('payment lifecycle', () => {
     expectStatus(() => service.status(session.order.id, 'x'.repeat(64)), 404);
     expectStatus(() => service.status(session.order.id, 'é'.repeat(64)), 404);
   });
+});
+
+test('CLP split preserves exact rounding up to maximum safe integer', () => {
+  for (const gross of [0, 1, 59, 60, 119, 28790, 49990, 1000000000000, Number.MAX_SAFE_INTEGER]) {
+    const { netCLP, ivaCLP } = splitGrossCLP(gross);
+    expect(Number.isSafeInteger(netCLP)).toBe(true);
+    expect(Number.isSafeInteger(ivaCLP)).toBe(true);
+    expect(netCLP + ivaCLP).toBe(gross);
+    const difference = BigInt(netCLP) * 119n - BigInt(gross) * 100n;
+    expect(difference >= -59n && difference <= 59n).toBe(true);
+  }
+  for (const invalid of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) expect(() => splitGrossCLP(invalid)).toThrow();
 });

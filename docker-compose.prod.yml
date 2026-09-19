@@ -9,6 +9,15 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      PAYMENT_ENV: ${PAYMENT_ENV:-sandbox}
+      WEBPAY_COMMERCE_CODE: ${WEBPAY_COMMERCE_CODE:-}
+      WEBPAY_API_KEY: ${WEBPAY_API_KEY:-}
+      PAYMENT_STORE_DIR: /var/data/payments
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      REDIS_URL: redis://redis:6379
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       GEMINI_TIMEOUT_MS: ${GEMINI_TIMEOUT_MS:-12000}
@@ -17,6 +26,11 @@ services:
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       EVENTS_API_TOKEN: ${EVENTS_API_TOKEN:-}
+    volumes:
+      - payments:/var/data/payments
+    depends_on:
+      redis:
+        condition: service_healthy
     mem_limit: 1g
     cpus: 1.0
     logging:
@@ -24,3 +38,15 @@ services:
       options:
         max-size: 20m
         max-file: '5'
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+volumes:
+  payments:

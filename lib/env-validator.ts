@@ -1,2 +1,2 @@
-export * from '../src/lib/env-validator';
-export { default } from '../src/lib/env-validator';
+export * from '../server/env-validator';
+export { default } from '../server/env-validator';

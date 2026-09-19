@@ -40,19 +40,25 @@ export type Customer = z.infer<typeof customerSchema>;
  * Reference: https://www.sii.cl/factura_electronica/libros_boletas.pdf
  * Mock assumption: shipping is part of the taxable sale, with no exempt items.
  */
+export function splitGrossCLP(gross: number) {
+  if (!Number.isSafeInteger(gross) || gross < 0) throw new Error('Monto CLP debe ser entero seguro no negativo');
+  // Exact rational rounding (100/119), no decimal floating-point tax rate.
+  const netCLP = Number((BigInt(gross) * 100n + 59n) / 119n);
+  return { netCLP, ivaCLP: gross - netCLP };
+}
 export function calculateTotals(items: CartItem[]) {
   const validated = cartSchema.parse(items);
   const productsGrossCLP = validated.reduce((total, item) => total + PRODUCTS.find(product => product.id === item.productId)!.priceCLP * item.quantity, 0);
   const shippingGrossCLP = productsGrossCLP >= FREE_SHIPPING_FROM_CLP ? 0 : SHIPPING_CLP;
   const totalCLP = productsGrossCLP + shippingGrossCLP;
-  const netCLP = Math.round(totalCLP * 100 / 119);
-  const shippingNetCLP = Math.round(shippingGrossCLP * 100 / 119);
+  const netCLP = splitGrossCLP(totalCLP).netCLP;
+  const shippingNetCLP = splitGrossCLP(shippingGrossCLP).netCLP;
   return { productsGrossCLP, shippingGrossCLP, productsNetCLP: netCLP - shippingNetCLP, shippingNetCLP, netCLP, ivaCLP: totalCLP - netCLP, totalCLP, currency: 'CLP' as const };
 }
 export type Totals = ReturnType<typeof calculateTotals>;
 export type PublicOrder = {
-  id: string; status: 'pending' | 'paid' | 'failed' | 'expired'; mode: 'mock' | 'sandbox' | 'production'; provider: 'webpay_plus_mock' | 'webpay_plus';
+  id: string; status: 'pending' | 'paid' | 'failed' | 'expired'; mode: 'mock' | 'sandbox' | 'production'; provider: 'webpay_plus_mock' | 'webpay_plus' | 'mercadopago';
   totals: Totals; createdAt: string; expiresAt: string;
   dte39: null | { type: 39; status: 'ready_for_issuance'; MntNeto: number; IVA: number; MntTotal: number };
 };
-export type CheckoutSession = { order: PublicOrder; paymentToken: string; redirect?: { url: string; token: string } };
+export type CheckoutSession = { order: PublicOrder; paymentToken: string; redirect?: { url: string; token: string; method?: 'GET' | 'POST' } };

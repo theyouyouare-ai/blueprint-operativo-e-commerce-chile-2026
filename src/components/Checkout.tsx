@@ -26,12 +26,13 @@ export function Checkout() {
   const [session, setSession] = useState<CheckoutSession | null>(readSession);
   const [busy, setBusy] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'mock' | 'sandbox' | 'production' | null>(null);
+  const [provider, setProvider] = useState('Webpay Plus');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(Boolean(session));
   const submission = useRef<{ body: string; key: string } | null>(null);
   const locked = useRef(false);
   useEffect(() => {
-    api<{ mode: 'mock' | 'sandbox' | 'production' }>('/api/checkout/config').then(config => setPaymentMode(config.mode)).catch(() => setError('No se pudo cargar la configuración de pagos. Recarga antes de continuar.'));
+    api<{ mode: 'mock' | 'sandbox' | 'production'; provider: string }>('/api/checkout/config').then(config => { setPaymentMode(config.mode); setProvider(config.provider === 'mercadopago' ? 'Mercado Pago' : 'Webpay Plus'); }).catch(() => setError('No se pudo cargar la configuración de pagos. Recarga antes de continuar.'));
   }, []);
   useEffect(() => { try { localStorage.setItem(CART_KEY, JSON.stringify(items)); } catch { /* Cart remains usable without storage. */ } }, [items]);
   const saveSession = (next: CheckoutSession | null) => {
@@ -91,19 +92,23 @@ export function Checkout() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Estado pendiente de verificación'); }
     finally { setBusy(false); }
   }
-  function redirectToWebpay() {
+  function redirectToPayment() {
     if (!session?.redirect) return;
     try {
       // Capability must survive full-page bank navigation. Do not proceed if storage is blocked.
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
       const url = new URL(session.redirect.url);
+      if (session.order.provider === 'mercadopago') {
+        if (url.protocol !== 'https:' || !['www.mercadopago.cl', 'sandbox.mercadopago.cl'].includes(url.hostname) || url.port || url.username || url.password) throw new Error('Destino de pago inválido');
+        window.location.assign(url.href); return;
+      }
       const host = session.order.mode === 'production' ? 'webpay3g.transbank.cl' : 'webpay3gint.transbank.cl';
       if (url.protocol !== 'https:' || url.hostname !== host) throw new Error('Destino de pago inválido');
       const form = document.createElement('form');
       form.method = 'POST'; form.action = url.href;
       const token = document.createElement('input'); token.type = 'hidden'; token.name = 'token_ws'; token.value = session.redirect.token;
       form.appendChild(token); document.body.appendChild(form); form.submit();
-    } catch { setError('No se puede guardar la sesión o abrir Webpay. Habilita el almacenamiento de este sitio.'); }
+    } catch { setError('No se puede guardar la sesión o abrir la pasarela de pago. Habilita el almacenamiento de este sitio.'); }
   }
   const mode = session?.order.mode ?? paymentMode;
   function restart() { saveSession(null); submission.current = null; setError(''); }
@@ -112,7 +117,7 @@ export function Checkout() {
     <header className="border-b border-stone-200 bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-5">
         <a href="/" className="flex items-center gap-2 text-sm font-semibold"><ArrowLeft size={17} /> Volver al blueprint</a>
-        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">{mode === 'production' ? 'WEBPAY · PAGOS REALES' : mode === 'sandbox' ? 'WEBPAY SANDBOX · SIN COBROS REALES' : mode === 'mock' ? 'TIENDA DEMO · SIN COBROS REALES' : 'VERIFICANDO ENTORNO DE PAGO'}</span>
+        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">{mode === 'production' ? `${provider.toUpperCase()} · PAGOS REALES` : mode === 'sandbox' ? `${provider.toUpperCase()} SANDBOX · SIN COBROS REALES` : mode === 'mock' ? 'TIENDA DEMO · SIN COBROS REALES' : 'VERIFICANDO ENTORNO DE PAGO'}</span>
       </div>
     </header>
     <main className="mx-auto max-w-6xl px-5 py-8 sm:py-12">
@@ -152,15 +157,15 @@ export function Checkout() {
                 <label className="text-sm font-medium sm:col-span-2">Dirección (calle, número y departamento)<input name="address" autoComplete="street-address" required minLength={5} maxLength={200} className={inputClass}/></label>
                 <label className="text-sm font-medium">Comuna<input name="commune" autoComplete="address-level2" required minLength={2} maxLength={80} className={inputClass}/></label>
                 <label className="text-sm font-medium">Región<input name="region" autoComplete="address-level1" required minLength={2} maxLength={80} className={inputClass}/></label>
-                <button type="submit" className="mt-2 rounded-xl bg-amber-400 px-5 py-3 font-bold text-stone-950 disabled:opacity-40 sm:col-span-2">{busy ? 'Creando orden…' : paymentMode === 'mock' ? 'Continuar a Webpay Plus simulado' : 'Continuar a Webpay Plus'}</button>
+                <button type="submit" className="mt-2 rounded-xl bg-amber-400 px-5 py-3 font-bold text-stone-950 disabled:opacity-40 sm:col-span-2">{busy ? 'Creando orden…' : paymentMode === 'mock' ? 'Continuar a Webpay Plus simulado' : `Continuar a ${provider}`}</button>
               </fieldset>
             </form>
           </>}
           {session && <section className="rounded-2xl border border-stone-200 bg-white p-6" aria-live="polite">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-500">{session.order.mode === 'mock' ? 'Webpay Plus · Simulador' : `Webpay Plus · ${session.order.mode}`}</span>
-            <h2 className="mt-3 text-2xl font-bold">{session.order.status === 'paid' ? (session.order.mode === 'mock' ? 'Pago simulado aprobado' : 'Pago aprobado por Webpay') : session.order.status === 'pending' ? (session.order.mode === 'mock' ? 'Confirma tu pago de prueba' : 'Orden pendiente de pago') : session.order.status === 'expired' ? 'La orden expiró' : (session.order.mode === 'mock' ? 'Pago simulado rechazado' : 'Pago no autorizado')}</h2>
+            <span className="text-xs font-bold uppercase tracking-wider text-stone-500">{session.order.mode === 'mock' ? 'Webpay Plus · Simulador' : `${provider} · ${session.order.mode}`}</span>
+            <h2 className="mt-3 text-2xl font-bold">{session.order.status === 'paid' ? (session.order.mode === 'mock' ? 'Pago simulado aprobado' : `Pago aprobado por ${provider}`) : session.order.status === 'pending' ? (session.order.mode === 'mock' ? 'Confirma tu pago de prueba' : 'Orden pendiente de pago') : session.order.status === 'expired' ? 'La orden expiró' : (session.order.mode === 'mock' ? 'Pago simulado rechazado' : 'Pago no autorizado')}</h2>
             <p className="mt-3 break-all text-xs text-stone-500">Orden {session.order.id}</p>
-            {session.order.status === 'pending' ? session.order.mode !== 'mock' ? <div className="mt-5 space-y-4"><p className="text-sm text-stone-600">Webpay recibe tus datos de tarjeta en su sitio. Al regresar, el servidor verifica el resultado con Transbank.</p><button disabled={busy} onClick={redirectToWebpay} className="rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white">Ir a Webpay</button><button disabled={busy} onClick={refreshStatus} className="ml-3 rounded-xl border px-5 py-3 text-sm font-semibold">Consultar estado del pago</button><p className="text-xs text-stone-500">Si ya pagaste, consulta el estado antes de volver al banco.</p></div> : <><p className="mt-5 text-sm text-stone-600">Elige el resultado que quieres probar. No se solicitan tarjetas ni se mueve dinero. La sesión dura 30 minutos.</p><div className="mt-6 flex flex-wrap gap-3"><button disabled={busy} onClick={() => confirm('approve')} className="rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white disabled:opacity-40">{busy ? 'Procesando…' : 'Simular pago aprobado'}</button><button disabled={busy} onClick={() => confirm('reject')} className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold disabled:opacity-40">Simular rechazo</button></div></> : <>
+            {session.order.status === 'pending' ? session.order.mode !== 'mock' ? <div className="mt-5 space-y-4"><p className="text-sm text-stone-600">{provider} recibe tus datos de pago en su sitio. El servidor verifica el resultado con el proveedor.</p><button disabled={busy} onClick={redirectToPayment} className="rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white">Ir a {provider}</button><button disabled={busy} onClick={refreshStatus} className="ml-3 rounded-xl border px-5 py-3 text-sm font-semibold">Consultar estado del pago</button><p className="text-xs text-stone-500">Si ya pagaste, consulta el estado antes de volver al banco.</p></div> : <><p className="mt-5 text-sm text-stone-600">Elige el resultado que quieres probar. No se solicitan tarjetas ni se mueve dinero. La sesión dura 30 minutos.</p><div className="mt-6 flex flex-wrap gap-3"><button disabled={busy} onClick={() => confirm('approve')} className="rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white disabled:opacity-40">{busy ? 'Procesando…' : 'Simular pago aprobado'}</button><button disabled={busy} onClick={() => confirm('reject')} className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold disabled:opacity-40">Simular rechazo</button></div></> : <>
               {session.order.status === 'paid' && <div className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900"><CheckCircle2 className="mb-2"/><p>Orden confirmada. Desglose preparado para la posterior boleta electrónica DTE 39.</p><p className="mt-2 font-semibold">No se ha emitido ni enviado una boleta al SII.</p></div>}
               <button onClick={restart} className="mt-6 rounded-xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white">{session.order.status === 'paid' ? session.order.mode === 'mock' ? 'Nueva compra de prueba' : 'Nueva compra' : 'Volver al checkout'}</button>
             </>}

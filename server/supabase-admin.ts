@@ -38,7 +38,7 @@ export function getSupabaseAdminConfig(): SupabaseAdminConfig | null {
     return null;
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey || serviceRoleKey.trim() === '') {
@@ -154,8 +154,8 @@ export async function checkSupabaseAdminHealth(): Promise<{ configured: boolean;
   }
 
   try {
-    const res = await fetch(`${config.url}/rest/v1/`, {
-      method: 'HEAD',
+    const res = await fetch(`${config.url}/rest/v1/payment_orders?select=id&limit=1`, {
+      method: 'GET',
       signal: AbortSignal.timeout(3000),
       headers: {
         'apikey': config.serviceRoleKey,

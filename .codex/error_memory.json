@@ -1,0 +1,37 @@
+[
+  {
+    "id": "ERR-001",
+    "sintoma": "No existía /health; /api/health respondía ok sin comprobar Redis ni exigir Supabase sano.",
+    "causa_raiz": "El diagnóstico comprobaba presencia de REDIS_URL y devolvía 200 incondicionalmente.",
+    "solucion": "Readiness común en /health y /api/health con consulta autenticada a payment_orders y PING Redis; 200 solo con ambos servicios sanos, 503 ante ausencia/fallo; /live separado. Pruebas de contrato, timeouts y errores en tests/unit/health.test.ts.",
+    "regla_preventiva": "No confundir configuración con conectividad ni liveness con readiness; probar dependencias ausentes y caídas."
+  },
+  {
+    "id": "ERR-002",
+    "sintoma": "/api/checkout/create-order no existía y /api/webhooks/mercadopago devolvía 503 en modo simulador.",
+    "causa_raiz": "Solo estaba expuesto /checkout/process y el webhook MP exigía runtime real incluso cuando el checkout era mock.",
+    "solucion": "Alias de creación con la misma validación/idempotencia; webhook usa HMAC del simulador únicamente si runtime.mock está activo. Pruebas HTTP de alias, rechazo RUT y firma/repetición.",
+    "regla_preventiva": "Probar los endpoints públicos solicitados en cada modo; nunca habilitar el protocolo mock cuando existe una pasarela real."
+  },
+  {
+    "id": "ERR-003",
+    "sintoma": "La ingesta de eventos aceptaba montos CLP fraccionarios y calculaba el neto dividiendo por 1.19.",
+    "causa_raiz": "Validación numérica sin int() y fórmula tributaria duplicada fuera del checkout.",
+    "solucion": "Helper splitGrossCLP con BigInt y razón 100/119, compartido con checkout; eventos exigen enteros. Pruebas de conservación y redondeo hasta MAX_SAFE_INTEGER.",
+    "regla_preventiva": "Centralizar desglose CLP, validar enteros seguros y probar neto + IVA = bruto sin tasa flotante."
+  },
+  {
+    "id": "ERR-004",
+    "sintoma": "Los módulos administrativos estaban en src/lib sin una barrera de build contra imports desde el cliente (sin exposición de claves constatada).",
+    "causa_raiz": "La separación servidor/cliente dependía únicamente de convenciones e imports actuales.",
+    "solucion": "Mover Supabase admin y validador a server/; plugin Vite bloquea módulos exclusivos del servidor en el grafo cliente. Pruebas negativas con builds Vite.",
+    "regla_preventiva": "Proteger la frontera cliente/servidor con validación ejecutable y auditar el bundle generado."
+  },
+  {
+    "id": "ERR-005",
+    "sintoma": "Una ejecución de npm run test perdió módulos Vite/Vitest mientras arrancaban sus workers.",
+    "causa_raiz": "La ejecución simultánea de CI=1 pnpm test:e2e recreó node_modules, según su salida, durante las pruebas unitarias.",
+    "solucion": "Completar la preparación de dependencias y ejecutar las validaciones restantes secuencialmente. Chromium finalizó con 13/13 pruebas aprobadas; la suite unitaria se volvió a ejecutar tras estabilizar la instalación. Consultar AUDITORIA_PRODUCCION.md para el resultado final.",
+    "regla_preventiva": "No ejecutar suites en paralelo con comandos de pnpm que puedan preparar o recrear node_modules; estabilizar la instalación primero."
+  }
+]

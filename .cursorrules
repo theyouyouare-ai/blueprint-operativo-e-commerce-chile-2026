@@ -1,0 +1,14 @@
+# Convenciones y memoria del proyecto
+
+Antes de cada generación o modificación de código, abrir y consultar estos archivos
+relativos a la raíz del repositorio:
+- .codex/rules.md
+- .codex/error_memory.json
+
+Aplicar sus convenciones y reglas preventivas pertinentes. No tratar el registro
+"Ejemplo de error" como un incidente real. Tras resolver un error comprobado,
+actualizar la memoria y validar el JSON según el protocolo de .codex/rules.md.
+Preservar los cambios existentes del usuario. Sus instrucciones explícitas prevalecen
+sobre estas convenciones.
+
+Este archivo referencia las fuentes compartidas; no duplicar aquí sus reglas.

@@ -5,7 +5,7 @@ import { getPaymentRuntime } from './payment-runtime';
 export const checkoutRouter = express.Router();
 checkoutRouter.get('/checkout/config', (_req, res) => {
   const { config } = getPaymentRuntime();
-  res.set('Cache-Control', 'no-store').json({ mode: config.mode, provider: config.mode === 'mock' ? 'webpay_plus_mock' : 'webpay_plus', reason: config.fallbackReason });
+  res.set('Cache-Control', 'no-store').json({ mode: config.mode, provider: config.mode === 'mock' ? 'webpay_plus_mock' : config.provider, reason: config.fallbackReason });
 });
 // Exact bytes for mock HMAC. URL-encoded GET/POST return for real Webpay.
 // No CORS/IP/header alone is trusted as payment evidence: commit/status SDK verifies it.
@@ -17,6 +17,7 @@ checkoutRouter.post('/webhooks/payment', express.raw({ type: 'application/json',
       const order = runtime.mock.webhook(req.body.toString('utf8'), req.get('x-payment-signature') ?? null, req.get('x-payment-timestamp') ?? null);
       res.set('Cache-Control', 'no-store').json({ order });
     } else {
+      if (!runtime.live) throw new CheckoutError(405, 'Utiliza el webhook de Mercado Pago');
       let body = req.body;
       if (Buffer.isBuffer(body)) { try { body = JSON.parse(body.toString('utf8')); } catch { throw new CheckoutError(400, 'JSON inválido'); } }
       const order = await runtime.live!.callback(body);
@@ -38,18 +39,32 @@ checkoutRouter.get('/webhooks/payment', async (req, res) => {
     res.set('Cache-Control', 'no-store').redirect(303, `${runtime.config.appOrigin}/checkout?orderId=${order.id}`);
   } catch { res.set('Cache-Control', 'no-store').redirect(303, `${runtime.config.appOrigin}/checkout?payment=verification_pending`); }
 });
+checkoutRouter.post('/webhooks/mercadopago', express.raw({ type: 'application/json', limit: '16kb' }), async (req, res) => {
+  try {
+    const { mp, mock } = getPaymentRuntime();
+    if (mock) {
+      if (!Buffer.isBuffer(req.body)) throw new CheckoutError(415, 'Usa Content-Type application/json');
+      const order = mock.webhook(req.body.toString('utf8'), req.get('x-payment-signature') ?? null, req.get('x-payment-timestamp') ?? null);
+      res.set('Cache-Control', 'no-store').json({ mode: 'mock', order });
+      return;
+    }
+    if (!mp) throw new CheckoutError(503, 'Mercado Pago no configurado');
+    await mp.webhook(req.query['data.id'], req.get('x-request-id'), req.get('x-signature'));
+    res.set('Cache-Control', 'no-store').sendStatus(200);
+  } catch (error) { respondError(error, res); }
+});
 checkoutRouter.use('/checkout', express.json({ limit: '16kb' }));
-checkoutRouter.post('/checkout/process', async (req, res) => {
+checkoutRouter.post(['/checkout/process', '/checkout/create-order'], async (req, res) => {
   try {
     const runtime = getPaymentRuntime();
-    const service = runtime.live ?? runtime.mock!;
+    const service = runtime.mp ?? runtime.live ?? runtime.mock!;
     res.set('Cache-Control', 'no-store').json(await service.process(req.body, req.get('idempotency-key') ?? null));
   } catch (error) { respondError(error, res); }
 });
 checkoutRouter.post('/checkout/mock-confirm', (req, res) => {
   try {
     const { mock } = getPaymentRuntime();
-    if (!mock) throw new CheckoutError(403, 'Simulación deshabilitada con Webpay configurado');
+    if (!mock) throw new CheckoutError(403, 'Simulación deshabilitada con pasarela real configurada');
     res.set('Cache-Control', 'no-store').json({ order: mock.mockConfirmation(req.body) });
   } catch (error) { respondError(error, res); }
 });
@@ -57,7 +72,7 @@ checkoutRouter.get('/checkout/status/:orderId', async (req, res) => {
   try {
     const runtime = getPaymentRuntime();
     const token = (req.get('authorization') || '').replace(/^Bearer /, '');
-    res.set('Cache-Control', 'no-store').json({ order: await (runtime.live ?? runtime.mock!).status(String(req.params.orderId), token) });
+    res.set('Cache-Control', 'no-store').json({ order: await (runtime.mp ?? runtime.live ?? runtime.mock!).status(String(req.params.orderId), token) });
   } catch (error) { respondError(error, res); }
 });
 function respondError(error: unknown, res: express.Response) {

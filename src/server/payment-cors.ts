@@ -10,7 +10,7 @@ export function paymentCors(config: PaymentConfig): RequestHandler {
       res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
       res.set('Access-Control-Max-Age', '600');
-    } else if (origin && req.path !== '/webhooks/payment') {
+    } else if (origin && !['/webhooks/payment', '/webhooks/mercadopago'].includes(req.path)) {
       res.status(403).json({ error: 'Origen no permitido' }); return;
     }
     if (req.method === 'OPTIONS') { res.sendStatus(204); return; }

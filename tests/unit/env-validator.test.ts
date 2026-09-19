@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { validateProductionEnv } from '../../src/lib/env-validator';
+import { validateProductionEnv } from '../../server/env-validator';
 test('production without Gemini key supports local fallback with defaults', () => {
   const result = validateProductionEnv({ strict: true, env: { NODE_ENV: 'production' } });
   expect(result.success).toBe(true);

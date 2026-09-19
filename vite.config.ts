@@ -2,12 +2,13 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import { clientBoundary } from './server/client-boundary';
 
 export default defineConfig(() => {
   return {
     base: '/',
     build: { outDir: 'dist/client' },
-    plugins: [react(), tailwindcss()],
+    plugins: [clientBoundary(), react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
