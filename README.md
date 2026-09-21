@@ -73,6 +73,19 @@ PostgreSQL y Redis del Compose original no estaban conectados a ningún cliente 
 
 `/checkout` incluye carrito, formulario y Webpay Plus. La selección condicional de simulador, sandbox y producción, la persistencia y el despliegue en Render están descritos en [DEPLOYMENT.md](DEPLOYMENT.md).
 
+## Generador Shopify para Chile
+
+La pestaña **14. Generador Shopify** valida formato y dígito verificador del RUT y descarga archivos personalizados sin guardar esos datos. El servicio `lib/shopify/instant-generator.ts` genera ambos contenidos en memoria, con validación compartida entre cliente y servidor.
+
+- `POST /api/shopify/download-catalog`: CSV UTF-8 con cinco productos del nicho mascotas (un héroe, tres complementarios y uno adicional), precios enteros CLP, etiquetas y SKU únicos. Se importan como borradores, sin fotos y con stock cero. Los precios son sugeridos y la selección no acredita ventas ni rentabilidad.
+- `POST /api/shopify/download-theme`: JSON con identidad, configuración de referencia Dawn, términos, devoluciones, garantía legal de seis meses e instrucciones. Adaptado de `theme_dawn_chile_pro_config_nova_chile_store.json`, sin conservar el RUT del archivo original.
+
+Ambas rutas reciben JSON `{ "rut": "12345678-5", "storeName": "Mi Tienda", "email": "tienda@example.com", "address": "Calle Prueba 123" }`. Solo el RUT es obligatorio; el nombre predeterminado es Nova Chile Store. Los contactos omitidos aparecen en `pending_fields`. Responden con `Content-Disposition: attachment` y `Cache-Control: no-store`; entradas inválidas devuelven 400, cuerpos mayores de 8 KB devuelven 413 y fallos internos devuelven 500. Se usa POST para evitar incluir el RUT en la URL.
+
+El JSON **no es un tema instalable ni un `settings_data.json` de Dawn**: Shopify requiere un tema completo en ZIP. Agrega Dawn y aplica los parámetros desde el editor; copia las políticas después de completar los datos pendientes y revisar la operación real del comercio. Pasarelas, couriers, captura de RUT y DTE requieren configuración independiente. Configura la moneda CLP y precios con impuestos incluidos antes de importar el CSV.
+
+Referencias: [formato CSV de Shopify](https://help.shopify.com/en/manual/products/import-export/using-csv), [instalación de temas](https://help.shopify.com/en/manual/online-store/themes/adding-themes), [SII: IVA en compras remotas de bienes](https://www.sii.cl/destacados/iva_bienes/) y [SERNAC: comercio electrónico](https://www.sernac.cl/portal/604/w3-propertyvalue-20982.html). La referencia a Ley 21.713 distingue el régimen de ventas remotas desde el extranjero de las obligaciones del vendedor local; no duplica el IVA ya recaudado bajo ese régimen.
+
 ## Alcance comercial
 
 Este proyecto es un blueprint operativo desplegable, no una tienda transaccional completa. Incluye checkout y un adaptador oficial Webpay Plus configurable. No incluye Mercado Pago, inventario conectado ni seguimiento real de couriers; tampoco emisión efectiva de DTE al SII. Los tickets y simulaciones del navegador no equivalen a persistencia multiusuario. El seguimiento de ejemplo se identifica como demostración. Los textos legales, tarifas y cifras de mercado son referencias del contenido original y requieren revisión independiente antes de utilizarlos comercialmente; esta intervención valida software, no certifica normativa.

@@ -8,6 +8,7 @@ import { ComplianceTab } from './components/tabs/ComplianceTab';
 import { LogisticsTab } from './components/tabs/LogisticsTab';
 import { ExecutiveDashboardTab } from './components/tabs/ExecutiveDashboardTab';
 import { TechStackAndGateways } from './components/TechStackAndGateways';
+import { ShopifyInstantGenerator } from './components/ShopifyInstantGenerator';
 import { LandingAndLegal } from './components/LandingAndLegal';
 import { TrafficAndAdsStrategy } from './components/TrafficAndAdsStrategy';
 import { QATestSuiteTab } from './components/tabs/QATestSuiteTab';
@@ -150,7 +151,8 @@ export default function App() {
     'qa_suite',
     'sprint',
     'atencion_cliente',
-    'market_insights'
+    'market_insights',
+    'shopify'
   ];
 
   return (
@@ -190,6 +192,7 @@ export default function App() {
         {activeTab === 'logistica' && <LogisticsTab exchangeRate={exchangeRate} />}
         {activeTab === 'dashboard_ejecutivo' && <ExecutiveDashboardTab />}
         {activeTab === 'stack' && <TechStackAndGateways />}
+        {activeTab === 'shopify' && <ShopifyInstantGenerator />}
         {activeTab === 'landing_legal' && <LandingAndLegal />}
         {activeTab === 'ads' && <TrafficAndAdsStrategy />}
         {activeTab === 'qa_suite' && <QATestSuiteTab onNavigateToTab={(tab) => setActiveTab(tab)} />}
@@ -232,7 +235,7 @@ export default function App() {
               </button>
             )}
 
-            {activeTab !== 'atencion_cliente' && (
+            {activeTab !== tabsOrder[tabsOrder.length - 1] && (
               <button
                 onClick={() => {
                   const currentIndex = tabsOrder.indexOf(activeTab);
@@ -286,4 +289,3 @@ export default function App() {
     </div>
   );
 }
-

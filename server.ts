@@ -11,6 +11,7 @@ import { getPaymentRuntime } from './src/server/payment-runtime';
 import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { productionSpa } from './server/production-spa';
+import { createShopifyRouter } from './server/shopify-router';
 import { GoogleGenAI } from '@google/genai';
 import { STORE_FAQS, findMatchingFAQ, shouldTriggerEscalation, MOCK_TRACKING_DATABASE } from './src/data/chatbotKnowledge';
 import { INITIAL_MARKET_NEWS, INITIAL_COMPLIANCE_MILESTONES, OFFICIAL_REGULATORY_SOURCES } from './src/data/marketInsightsData';
@@ -42,6 +43,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use('/api', checkoutRouter);
+app.use('/api/shopify', createShopifyRouter());
 app.use(express.json({ limit: '32kb' }));
 
 // Readiness: HTTP 200 only after active Supabase query and Redis PING.

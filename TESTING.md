@@ -42,3 +42,14 @@ Los pagos de estas suites son simulados o usan dobles de dependencias. No acredi
 - Regresión de recarga de checkout en WebKit: 10/10 repeticiones aprobadas antes de la ejecución completa.
 - `git diff --check` y memoria JSON: correctos.
 - Persisten advertencias no bloqueantes de Vite sobre anotaciones de Zod y tamaño del bundle.
+
+## Generador Shopify — 21 de septiembre de 2026
+
+Se agregaron 18 pruebas Vitest: diez para catálogo, escape CSV/HTML, RUT, inyección de identidad, políticas y aislamiento entre comercios; ocho de integración Express para adjuntos, MIME UTF-8, no-store, validación, límites de cuerpo y recuperación tras un error interno. La primera ejecución de las pruebas del generador falló por ausencia del módulo; pasó después de implementar el servicio.
+
+Los dos recorridos nuevos de Playwright verifican la pestaña Shopify, bloqueo con RUT inválido, descargas CSV/JSON reales desde Express y recuperación tras una respuesta 500. Se leen los archivos descargados y se comprueban los cinco productos, precios, identidad, políticas y parámetros del tema en los tres motores.
+
+- `pnpm check`: TypeScript, **125/125 pruebas en 15 archivos**, Vite y esbuild aprobados.
+- `pnpm test:e2e`: **54/54 aprobadas**, sin omisiones ni reintentos; 18 por motor.
+- Se mantienen las 107 pruebas Vitest y 48 E2E anteriores sin modificar sus archivos.
+- La validación cubre el formato generado y el flujo local. No se realizó una importación en una cuenta Shopify ni una instalación de tema: el JSON es configuración de referencia para Dawn, no un ZIP instalable.

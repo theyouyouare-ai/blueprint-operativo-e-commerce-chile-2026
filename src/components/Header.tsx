@@ -36,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'sprint', label: '11. Sprint 7 Días' },
     { id: 'atencion_cliente', label: '12. Chatbot & Soporte' },
     { id: 'market_insights', label: '13. Radar Regulatorio & Noticias' },
+    { id: 'shopify', label: '14. Generador Shopify' },
   ];
 
   const progressPct = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;

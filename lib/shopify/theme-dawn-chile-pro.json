@@ -1,0 +1,20 @@
+{
+  "theme_name": "Dawn Pro Chile 2026 - Conversion Optimized",
+  "store_name": "",
+  "rut": "",
+  "currency": "CLP",
+  "money_format": "$ {{amount_no_decimals}}",
+  "badges_suggested": ["Webpay Plus Transbank", "Redcompra Débito y Crédito", "Mercado Pago Empresas Chile", "Garantía legal de 6 meses", "Despacho Blue Express & Starken"],
+  "announcement_bar": {
+    "enabled": true,
+    "text": "Precios en CLP con IVA incluido · Garantía legal de 6 meses",
+    "background_color": "#0f172a",
+    "text_color": "#ffffff"
+  },
+  "checkout_settings": {
+    "rut_field_mandatory": true,
+    "region_comuna_selector": "Chile Regiones y Comunas",
+    "taxes_included_in_prices": true,
+    "iva_rate": 0.19
+  }
+}
