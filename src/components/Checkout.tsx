@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ShoppingBag, ArrowLeft, ShieldCheck, Truck, CheckCircle2, Minus, Plus, Trash2 } from 'lucide-react';
-import { PRODUCTS, FREE_SHIPPING_FROM_CLP, SHIPPING_CLP, calculateTotals, cartSchema, customerSchema, clp, type CartItem, type CheckoutSession, type PublicOrder } from '../checkout/model';
+import { PRODUCTS, FREE_SHIPPING_FROM_CLP, SHIPPING_CLP, calculateTotals, cartSchema, customerSchema, checkoutSessionSchema, clp, type CartItem, type CheckoutSession, type PublicOrder } from '../checkout/model';
 
 const CART_KEY = 'blueprint-cart-v1';
 const SESSION_KEY = 'blueprint-checkout-v1';
@@ -9,12 +9,14 @@ function readCart(): CartItem[] {
 }
 function readSession(): CheckoutSession | null {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
-    return saved?.order?.id && /^[a-f0-9]{64}$/.test(saved.paymentToken) ? saved : null;
+    const saved = checkoutSessionSchema.safeParse(JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'));
+    return saved.success ? saved.data : null;
   } catch { return null; }
 }
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+  const timeout = AbortSignal.timeout(15000);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const response = await fetch(url, { mode: 'same-origin', ...options, signal });
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(body?.error || 'Servicio temporalmente no disponible');
   return body;
@@ -31,8 +33,35 @@ export function Checkout() {
   const [checking, setChecking] = useState(Boolean(session));
   const submission = useRef<{ body: string; key: string } | null>(null);
   const locked = useRef(false);
-  useEffect(() => {
-    api<{ mode: 'mock' | 'sandbox' | 'production'; provider: string }>('/api/checkout/config').then(config => { setPaymentMode(config.mode); setProvider(config.provider === 'mercadopago' ? 'Mercado Pago' : 'Webpay Plus'); }).catch(() => setError('No se pudo cargar la configuración de pagos. Recarga antes de continuar.'));
+  // Install navigation cancellation before the first paint can trigger a reload.
+  useLayoutEffect(() => {
+    let controller = new AbortController();
+    const load = () => {
+      const { signal } = controller;
+      api<{ mode: 'mock' | 'sandbox' | 'production'; provider: string }>('/api/checkout/config', { signal })
+        .then(config => {
+          if (signal.aborted) return;
+          setPaymentMode(config.mode);
+          setProvider(config.provider === 'mercadopago' ? 'Mercado Pago' : 'Webpay Plus');
+        })
+        .catch(() => {
+          if (!signal.aborted) setError('No se pudo cargar la configuración de pagos. Recarga antes de continuar.');
+        });
+    };
+    const cancel = () => controller.abort();
+    const resume = (event: PageTransitionEvent) => {
+      if (event.persisted) { controller = new AbortController(); load(); }
+    };
+    load();
+    window.addEventListener('beforeunload', cancel);
+    window.addEventListener('pagehide', cancel);
+    window.addEventListener('pageshow', resume);
+    return () => {
+      cancel();
+      window.removeEventListener('beforeunload', cancel);
+      window.removeEventListener('pagehide', cancel);
+      window.removeEventListener('pageshow', resume);
+    };
   }, []);
   useEffect(() => { try { localStorage.setItem(CART_KEY, JSON.stringify(items)); } catch { /* Cart remains usable without storage. */ } }, [items]);
   const saveSession = (next: CheckoutSession | null) => {

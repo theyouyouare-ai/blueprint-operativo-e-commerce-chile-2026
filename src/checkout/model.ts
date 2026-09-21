@@ -62,3 +62,28 @@ export type PublicOrder = {
   dte39: null | { type: 39; status: 'ready_for_issuance'; MntNeto: number; IVA: number; MntTotal: number };
 };
 export type CheckoutSession = { order: PublicOrder; paymentToken: string; redirect?: { url: string; token: string; method?: 'GET' | 'POST' } };
+
+// Persisted browser data must be validated before it can drive the checkout UI.
+const clpAmountSchema = z.number().int().nonnegative();
+export const checkoutSessionSchema = z.object({
+  paymentToken: z.string().regex(/^[a-f0-9]{64}$/),
+  order: z.object({
+    id: z.string().uuid(),
+    status: z.enum(['pending', 'paid', 'failed', 'expired']),
+    mode: z.enum(['mock', 'sandbox', 'production']),
+    provider: z.enum(['webpay_plus_mock', 'webpay_plus', 'mercadopago']),
+    createdAt: z.iso.datetime(), expiresAt: z.iso.datetime(),
+    totals: z.object({
+      productsGrossCLP: clpAmountSchema, shippingGrossCLP: clpAmountSchema,
+      productsNetCLP: clpAmountSchema, shippingNetCLP: clpAmountSchema,
+      netCLP: clpAmountSchema, ivaCLP: clpAmountSchema, totalCLP: clpAmountSchema,
+      currency: z.literal('CLP'),
+    }),
+    dte39: z.object({
+      type: z.literal(39), status: z.literal('ready_for_issuance'),
+      MntNeto: clpAmountSchema, IVA: clpAmountSchema, MntTotal: clpAmountSchema,
+    }).nullable(),
+  }),
+  redirect: z.object({ url: z.string().url(), token: z.string(), method: z.enum(['GET', 'POST']).optional() }).optional(),
+// Without strictNullChecks, Zod infers nullable fields as optional; the schema requires them at runtime.
+}) as z.ZodType<CheckoutSession>;

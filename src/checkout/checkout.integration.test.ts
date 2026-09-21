@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import express from 'express';
 import { createHmac, randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import { checkoutRouter } from '../server/checkout-router';
+import { getCheckoutService } from '../server/checkout-service';
 let server: Server;
 let base = '';
 const previousSecret = process.env.PAYMENT_WEBHOOK_SECRET;
@@ -81,4 +82,27 @@ test('create-order alias shares idempotency with process and signed MP simulator
   expect(await original.json()).toEqual(created);
   const invalid = await fetch(`${base}/api/checkout/create-order`, { ...options, body: JSON.stringify({ ...body, customer: { ...body.customer, document: '12345678-9' } }) });
   expect(invalid.status).toBe(400);
+});
+
+test.each([{}, { items: null, customer: null }, { items: [null], customer: {} }])('invalid checkout HTTP payload %# returns 400 without creating an order', async body => {
+  const response = await fetch(`${base}/api/checkout/process`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() }, body: JSON.stringify(body),
+  });
+  expect(response.status).toBe(400);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(await response.json()).toEqual({ error: expect.any(String) });
+});
+
+test('unexpected checkout failure returns a sanitized JSON 500 and recovers', async () => {
+  const spy = vi.spyOn(getCheckoutService(), 'process').mockImplementationOnce(() => { throw new Error('private infrastructure details'); });
+  try {
+    const response = await fetch(`${base}/api/checkout/process`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toEqual({ error: 'No se pudo procesar el pago' });
+    expect(spy).toHaveBeenCalledOnce();
+  } finally { spy.mockRestore(); }
+  expect((await createOrder()).order.status).toBe('pending');
 });

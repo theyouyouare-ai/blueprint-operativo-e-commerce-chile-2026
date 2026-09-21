@@ -20,6 +20,7 @@ Actualizar este documento cuando cambien decisiones verificadas del proyecto.
 - Inyectar dependencias de red, persistencia y bloqueo en servicios para probar comportamiento sin servicios reales.
 - Mantener Supabase administrativo (`server/supabase-admin.ts`), configuración privada (`server/env-validator.ts`) y Redis exclusivamente en servidor. Vite debe rechazar su importación por el cliente. Las migraciones versionadas pertenecen a `supabase/migrations/`.
 - Componentes React funcionales y hooks; mantener el estado de interfaz separado de los hechos financieros verificados por el servidor.
+- Validar datos de localStorage/sessionStorage antes de restaurarlos; conservar una orden válida si falla su consulta al servidor, sin habilitar automáticamente otra compra.
 - La compilación genera `dist/client` (SPA) y `dist/server.js` (Express). No editar artefactos generados.
 
 ## Estándares de código
@@ -60,6 +61,7 @@ Actualizar este documento cuando cambien decisiones verificadas del proyecto.
 - Para código TypeScript: `pnpm typecheck` y pruebas pertinentes con Vitest. Para pagos, cubrir firma inválida, repetición/concurrencia, montos y entornos incorrectos, persistencia y caídas de dependencias.
 - Antes de entregar cambios de código o configuración de build, ejecutar `pnpm check` (TypeScript, suite unitaria/integración y build). Si algo impide ejecutarlo, informar la limitación sin declarar éxito.
 - Para cambios de navegación o interfaz, ejecutar las pruebas Playwright relevantes tras compilar cuando el entorno disponga del navegador. Pruebas con dobles de proveedores no acreditan pagos reales.
+- Verificar recuperación de módulos fallidos en los tres motores. Al actualizar Playwright, comprobar compatibilidad con los binarios disponibles para el SO del host; no omitir pruebas para ocultar un fallo de protocolo.
 - Para documentación o memoria exclusivamente, basta verificar archivos, enlaces locales y JSON; no ejecutar la suite completa sin motivo.
 - Revisar `git diff --check`, el alcance del diff y resultados reales. No eliminar pruebas ni relajar aserciones solo para obtener pases.
 - Informar qué cambió, qué se verificó y qué depende de credenciales o infraestructura externa. No reutilizar recuentos históricos como resultados de la tarea actual.

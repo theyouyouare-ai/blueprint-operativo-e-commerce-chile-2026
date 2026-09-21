@@ -33,5 +33,33 @@
     "causa_raiz": "La ejecución simultánea de CI=1 pnpm test:e2e recreó node_modules, según su salida, durante las pruebas unitarias.",
     "solucion": "Completar la preparación de dependencias y ejecutar las validaciones restantes secuencialmente. Chromium finalizó con 13/13 pruebas aprobadas; la suite unitaria se volvió a ejecutar tras estabilizar la instalación. Consultar AUDITORIA_PRODUCCION.md para el resultado final.",
     "regla_preventiva": "No ejecutar suites en paralelo con comandos de pnpm que puedan preparar o recrear node_modules; estabilizar la instalación primero."
+  },
+  {
+    "id": "ERR-006",
+    "sintoma": "Una sesión persistida con order.id y paymentToken pero sin el resto de la orden ocultaba el carrito y mostraba Pago no autorizado con modo undefined.",
+    "causa_raiz": "readSession solo verificaba presencia del ID y formato del token antes de usar el objeto como CheckoutSession.",
+    "solucion": "Validar la estructura completa mediante checkoutSessionSchema antes de restaurar la sesión. La prueba de componente reprodujo el fallo y pasó después del cambio; se añadieron casos para conservar sesiones válidas cuando falla la consulta de estado.",
+    "regla_preventiva": "Validar datos persistidos del navegador como entradas externas antes de alimentar componentes; distinguir una sesión malformada de una orden válida pendiente de verificación."
+  },
+  {
+    "id": "ERR-007",
+    "sintoma": "Playwright 1.63.0 no podía crear páginas WebKit en macOS 14.8.9: Unknown setting: PushAPIEnabled.",
+    "causa_raiz": "El adaptador enviaba un ajuste de protocolo no soportado por el WebKit congelado 2251 distribuido para macOS 14; el fallo ocurría antes de cargar la aplicación.",
+    "solucion": "Fijar @playwright/test en 1.61.0 y sincronizar sus navegadores. WebKit pudo ejecutar los recorridos de checkout, navegación y exportación; el fallo posterior de recuperación del módulo de arranque es independiente.",
+    "regla_preventiva": "Al actualizar Playwright, verificar la compatibilidad del adaptador con los binarios disponibles para el SO del host y ejecutar los tres motores; no ocultar incompatibilidades omitiendo proyectos o pruebas."
+  },
+  {
+    "id": "ERR-008",
+    "sintoma": "Tras abortar la descarga de bootstrap en WebKit, Recargar página volvía a mostrar el error de arranque aunque la red estuviera disponible.",
+    "causa_raiz": "La traza mostró un modulepreload fallido retenido en caché: tras recargar no se solicitaba bootstrap de nuevo. Coincide con el defecto WebKit 270357; desactivar modulePreload eliminó el fallo reproducible.",
+    "solucion": "Configurar build.modulePreload=false en Vite, conservando imports dinámicos y carga de CSS. Las dos pruebas existentes de startup pasaron en WebKit tras compilar, sin cambiar aserciones ni tiempos de espera.",
+    "regla_preventiva": "Verificar recuperación de descargas fallidas sobre el build en todos los motores; consultar la traza de red antes de atribuir un timeout a lentitud o modificar pruebas."
+  },
+  {
+    "id": "ERR-009",
+    "sintoma": "Recargar /checkout mientras consultaba su configuración producía intermitentemente un pageerror de WebKit sobre access control checks; la petición tampoco se cancelaba al desmontar el componente.",
+    "causa_raiz": "La consulta y sus manejadores de salida se iniciaban en un efecto pasivo, después de que la interfaz pudiera estar visible; además faltaba cancelación. Cancelar desde el efecto pasivo no eliminó el fallo intermitente. Preparar la consulta y la cancelación en useLayoutEffect, antes del pintado, eliminó el fallo en 10 repeticiones. El detalle interno del mensaje WebKit no está confirmado.",
+    "solucion": "Inicializar consulta y cancelación antes del primer pintado, combinar la señal con el timeout, cancelar al desmontar/salir y reanudar tras restauración de página. Declarar mode=same-origin para la API local. La prueba original de recarga pasó 10 repeticiones en WebKit sin cambiar aserciones ni agregar reintentos automáticos.",
+    "regla_preventiva": "Propagar señales de cancelación en peticiones ligadas al ciclo de vida de la UI y declarar el alcance de origen de la API; distinguir fallos observados del navegador de causas internas no confirmadas."
   }
 ]

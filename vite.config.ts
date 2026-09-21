@@ -7,7 +7,12 @@ import { clientBoundary } from './server/client-boundary';
 export default defineConfig(() => {
   return {
     base: '/',
-    build: { outDir: 'dist/client' },
+    build: {
+      outDir: 'dist/client',
+      // WebKit conserva precargas fallidas incluso al recargar (bug 270357).
+      // Los imports dinámicos siguen cargando los módulos y sus estilos.
+      modulePreload: false,
+    },
     plugins: [clientBoundary(), react(), tailwindcss()],
     resolve: {
       alias: {
