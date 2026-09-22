@@ -11,7 +11,7 @@ services:
       name: payments
       mountPath: /var/data/payments
       sizeGB: 1
-    buildCommand: corepack enable && corepack prepare pnpm@11.19.0 --activate && pnpm install --frozen-lockfile --prod=false && pnpm typecheck && PAYMENT_ENV=sandbox WEBPAY_COMMERCE_CODE= WEBPAY_API_KEY= MERCADOPAGO_ACCESS_TOKEN= APP_URL=http://localhost:3000 pnpm test:unit && pnpm build
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm typecheck && PAYMENT_ENV=sandbox WEBPAY_COMMERCE_CODE= WEBPAY_API_KEY= MERCADOPAGO_ACCESS_TOKEN= APP_URL=http://localhost:3000 pnpm test:unit && pnpm build
     startCommand: NODE_ENV=production node dist/server.js
     healthCheckPath: /health
     envVars:

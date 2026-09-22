@@ -68,5 +68,12 @@
     "causa_raiz": "transbank-sdk 6.1.1 expone sus símbolos CommonJS mediante getters. Node 22 no los reconoce como exportaciones ESM nombradas al ejecutar el bundle con paquetes externos, aunque Vitest y Node 24 aceptaban la importación.",
     "solucion": "Importar el objeto CommonJS por defecto y extraer Environment, Options y WebpayPlus. La nueva prueba compila el adaptador ESM y lo ejecuta en un subproceso Node nativo construyendo el SDK sin llamadas bancarias; reprodujo el fallo y pasó después del cambio con Node 22.23.2.",
     "regla_preventiva": "Probar bundles de producción con Node nativo, además del runner de tests, y no depender de exportaciones nombradas inferidas en SDK CommonJS externos."
+  },
+  {
+    "id": "ERR-011",
+    "sintoma": "El despliegue de 6d15678 en Render falló con EROFS al intentar unlink de /usr/bin/pnpm, según el log reportado por el usuario.",
+    "causa_raiz": "El build ejecutaba corepack enable y corepack prepare --activate para configurar el ejecutable global sobre un sistema de archivos de solo lectura.",
+    "solucion": "Eliminar ambas operaciones globales del buildCommand y ejecutar directamente pnpm, conservando instalación con lockfile, typecheck, pruebas y compilación.",
+    "regla_preventiva": "En Render usar el pnpm disponible en el entorno; no activar ni reinstalar shims globales dentro del build. Verificar también el comando guardado en el panel cuando el servicio no está gestionado por Blueprint."
   }
 ]
