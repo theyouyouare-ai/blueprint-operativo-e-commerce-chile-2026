@@ -1,10 +1,13 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { Environment, Options, WebpayPlus } from 'transbank-sdk';
+import transbank from 'transbank-sdk';
 import { calculateTotals, checkoutSchema, type CartItem, type Customer, type CheckoutSession, type PublicOrder } from '../checkout/model';
 import { CheckoutError } from './checkout-service';
 import type { PaymentConfig } from './payment-config';
+
+// The SDK exposes CommonJS getters; Node 22 cannot infer them as named ESM exports.
+const { Environment, Options, WebpayPlus } = transbank;
 
 export interface WebpayTransaction {
   create(buyOrder: string, sessionId: string, amount: number, returnUrl: string): Promise<{ token: string; url: string }>;

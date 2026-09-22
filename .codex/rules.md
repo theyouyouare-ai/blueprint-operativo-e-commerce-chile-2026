@@ -31,6 +31,7 @@ Actualizar este documento cuando cambien decisiones verificadas del proyecto.
 - Usar `async/await`, timeouts en solicitudes externas y errores controlados. No convertir fallos de infraestructura en éxitos.
 - Mensajes al usuario en español; comentarios breves que expliquen decisiones y restricciones.
 - No importar módulos Node ni servicios administrativos en el bundle del navegador.
+- Para SDK CommonJS externos al bundle ESM, usar importación por defecto y verificar el arranque con Node nativo en las versiones soportadas; Vitest puede ocultar diferencias de interoperabilidad.
 
 ## Pagos e idempotencia
 
