@@ -14,11 +14,11 @@ El servidor carga `.env.local` y `.env` sin sobrescribir variables del host. Com
 
 1. Conectar este repositorio a un Blueprint de Render usando `render.yaml`.
 2. Mantener `PAYMENT_ENV=sandbox` durante pruebas. Configurar `WEBPAY_COMMERCE_CODE`, `WEBPAY_API_KEY` y, opcionalmente, `GEMINI_API_KEY` en Render. Sin credenciales de ninguna pasarela, funciona el simulador.
-3. Render compila Vite en `dist/client` y Express en `dist/server.js`; sirve ambos desde el mismo dominio. Health check: `/health` (requiere Supabase y Redis activos, incluso en sandbox).
+3. Render compila Vite en `dist/client` y Express en `dist/server.js`; sirve ambos desde el mismo dominio. Configurar `/health` como health check cuando Supabase y Redis estén activos; el Blueprint básico no declara estas dependencias.
 4. El origen usa `RENDER_EXTERNAL_URL` automáticamente. Para un dominio personalizado, configurar `APP_URL=https://dominio` (sin ruta).
 5. Probar creación, aprobación, rechazo, cancelación y retorno en sandbox. Antes de operar, sustituir credenciales por las de tu comercio habilitado y cambiar `PAYMENT_ENV=production`.
 
-El Blueprint declara un servicio de pago y un disco persistente de 1 GB, sin desplegarlo automáticamente desde esta tarea. La implementación de almacenamiento admite **un único proceso y una única instancia**; no usar clustering ni múltiples réplicas sobre este almacén. Para escalar, migrar a una base transaccional con bloqueo distribuido. Respaldar el disco y gestionar la retención de datos personales; las órdenes reales no se eliminan automáticamente. Límite actual: 10.000 órdenes por almacén.
+El Blueprint básico declara únicamente el servicio Node `tienda-gonzalo-cl-2026-app`. Para Webpay real, configurar por separado un disco persistente y `PAYMENT_STORE_DIR`. La implementación de almacenamiento admite **un único proceso y una única instancia**; no usar clustering ni múltiples réplicas sobre este almacén. Para escalar, migrar a una base transaccional con bloqueo distribuido. Respaldar el disco y gestionar la retención de datos personales; las órdenes reales no se eliminan automáticamente. Límite actual: 10.000 órdenes por almacén.
 
 ## Flujo de pago
 
@@ -45,7 +45,7 @@ Render termina TLS y el servidor confía en un salto de proxy únicamente cuando
 - `npm test` ejecuta las pruebas unitarias e integración. Después de `npm run build`, ejecutar `pnpm test:e2e --project=chromium` para verificar carga, recuperación, API y navegación.
 - Las variables privadas se leen en Node. El navegador no requiere variables de entorno; cualquier futura opción pública debe leerse con `import.meta.env.VITE_*` y un valor de respaldo, nunca incluir claves privadas.
 
-Las 35 pruebas originales se conservan. Se agregan pruebas de configuración, persistencia, idempotencia, validación del resultado bancario y CORS con un adaptador de prueba. El build de Render limpia las credenciales Webpay durante las pruebas para evitar llamadas reales.
+Las 35 pruebas originales se conservan. Se agregan pruebas de configuración, persistencia, idempotencia, validación del resultado bancario y CORS con un adaptador de prueba. El build de Render usa directamente pnpm para instalar con lockfile, validar tipos y compilar, sin activar ejecutables globales mediante Corepack. Las pruebas se ejecutan por separado en local y CI.
 
 Se comprobó además la creación y consulta de una transacción en el sandbox oficial con sus credenciales públicas de integración: estado `INITIALIZED`, sin autorización ni cobro. Esto no acredita el acceso del comercio a producción ni sustituye una prueba de pago/retorno completa.
 
@@ -90,7 +90,7 @@ para pagos production; en Render TLS termina en su proxy y `RENDER=true` habilit
 la confianza en un salto. Para otros proxies, configurar `TRUST_PROXY` con las IP/CIDR exactas del proxy
 y restringir el acceso directo al contenedor desde Internet.
 
-`render.yaml` aprovisiona un servicio de pago, disco y Redis privado sin eviction.
+`render.yaml` declara el servicio Node con build directo y `pnpm start`; no aprovisiona disco ni Redis. Configurar esas dependencias por separado para pagos reales. En un servicio administrado manualmente, guardar también los comandos en el panel: publicar este archivo no sobrescribe por sí solo los ajustes existentes.
 El entorno inicial es sandbox: cambiar a production solo tras validar el flujo completo.
 Se elige contenedor/Render; no se incluye `vercel.json` porque Webpay conserva un
 almacén local persistente que no es compatible con funciones efímeras de Vercel.
@@ -114,7 +114,7 @@ Fuentes oficiales: [firma Mercado Pago](https://www.mercadopago.cl/developers/en
 - `GET /health` y `/api/health`: readiness con consulta autenticada a
   `payment_orders` en Supabase y `PING` a Redis en paralelo. Devuelven 200 solo si
   ambos responden; credenciales ausentes, migración faltante o caída devuelven 503.
-  `GET /live` solo indica que Express está vivo. Render y Docker usan `/health`:
+  `GET /live` solo indica que Express está vivo. Docker usa `/health`; configurarlo en Render después de
   provisionar las dependencias y aplicar la migración antes del despliegue.
 - `POST /api/checkout/create-order` es alias de `/api/checkout/process`: mismo
   contrato JSON, esquema de cliente, validación RUT e Idempotency-Key.
